@@ -32,29 +32,24 @@ async function run() {
     const cartCollection = client.db("techshop").collection('cart');
     const usersCollection = client.db("techshop").collection('users');
 
-    app.get('/components', async (req, res) => {
-      const result = await componentsCollection.find().toArray();
-      res.send(result)
-    })
 
-
-    //token----------------------------
-    app.post('/jwt', async(req, res) => {
+    //-------------------------------TOKEN----------------------------
+    app.post('/jwt', async (req, res) => {
       const user = req.body;
-      const token = jwt.sign(user, process.env.ACCESS_TOKEN, {expiresIn: '1h'})
-      res.send({token})
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN, { expiresIn: '1h' })
+      res.send({ token })
     })
 
-    //middleware
+    //----------------------------MIDDLEWARE------------------------
     const verifyToken = (req, res, next) => {
       // console.log('inside verify token', req.headers.authorization);
-      if(!req.headers.authorization){
-        return res.status(401).send({message: 'forbidden access'})
+      if (!req.headers.authorization) {
+        return res.status(401).send({ message: 'forbidden access' })
       }
       const token = req.headers.authorization.split(' ')[1];
       jwt.verify(token, process.env.ACCESS_TOKEN, (err, decoded) => {
-        if(err){
-          return res.status(401).send({message: 'forbidden access'})
+        if (err) {
+          return res.status(401).send({ message: 'forbidden access' })
         }
         req.decoded = decoded;
         next();
@@ -64,14 +59,59 @@ async function run() {
     //verify admin
     const verifyAdmin = async (req, res, next) => {
       const email = req.decoded.email;
-      const query = {email: email};
+      const query = { email: email };
       const user = await usersCollection.findOne(query);
       const isAdmin = user?.role === 'admin';
-      if(!isAdmin){
-        return res.status(403).send({message: 'forbidden access'})
+      if (!isAdmin) {
+        return res.status(403).send({ message: 'forbidden access' })
       }
       next()
     }
+
+    //--------------------component--------------------------
+    app.get('/components', async (req, res) => {
+      const result = await componentsCollection.find().toArray();
+      res.send(result)
+    })
+
+    app.post('/components', verifyToken, verifyAdmin, async (req, res) => {
+      const product = req.body;
+      const result = await componentsCollection.insertOne(product)
+      res.send(result)
+    })
+
+    app.get('/components/:id', async(req, res) => {
+      const id = req.params.id;
+      const query = {_id: new ObjectId(id)};
+      const result = await componentsCollection.findOne(query);
+      res.send(result)
+    })
+
+    app.patch('/components/:id', async(req, res) => {
+      const product = req.body;
+      const id = req.params.id;
+      const query = {_id: new ObjectId(id)};
+      const updatedDoc = {
+        $set:{
+          name: product.name,
+          price: product.price,
+          category: product.category,
+          brand: product.brand,
+          stock: product.stock,
+          imageUrl: product.imageUrl,
+          description: product.description,
+        }
+      }
+      const result = await componentsCollection.updateOne(query, updatedDoc)
+      res.send(result)
+    })
+
+    app.delete('/components/:id', verifyToken, verifyAdmin, async(req, res) => {
+      const id = req.params.id;
+      const query = {_id: new ObjectId(id)}
+      const result = await componentsCollection.deleteOne(query);
+      res.send(result)
+    })
 
     // users---------------------------
     app.get('/users', verifyToken, verifyAdmin, async (req, res) => {
@@ -81,26 +121,26 @@ async function run() {
 
     app.post('/users', async (req, res) => {
       const user = req.body;
-      const query = {email: user.email}
+      const query = { email: user.email }
       const existingUser = await usersCollection.findOne(query)
-      if(existingUser){
-        return res.send({message: 'User already exists', insertedId: null})
+      if (existingUser) {
+        return res.send({ message: 'User already exists', insertedId: null })
       }
       const result = await usersCollection.insertOne(user);
       res.send(result)
-    })    
+    })
 
-    app.delete('/users/:id', verifyToken, verifyAdmin, async(req, res) => {
+    app.delete('/users/:id', verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
-      const query = {_id: new ObjectId(id)}
+      const query = { _id: new ObjectId(id) }
       const result = await usersCollection.deleteOne(query)
       res.send(result)
     })
 
     //make admin
-    app.patch('/users/admin/:id', verifyToken, verifyAdmin, async(req, res) => {
+    app.patch('/users/admin/:id', verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
-      const filter = {_id: new ObjectId(id)};
+      const filter = { _id: new ObjectId(id) };
       const updatedDoc = {
         $set: {
           role: 'admin'
@@ -111,28 +151,28 @@ async function run() {
     })
 
     //check if admin
-    app.get('/users/admin/:email', verifyToken, async(req, res) => {
+    app.get('/users/admin/:email', verifyToken, async (req, res) => {
       const email = req.params.email;
-      if(email !== req.decoded.email){
-        return res.status(403).send({message: 'unauthorized access'})
+      if (email !== req.decoded.email) {
+        return res.status(403).send({ message: 'unauthorized access' })
       }
 
-      const query = {email: email};
+      const query = { email: email };
       const user = await usersCollection.findOne(query);
       // console.log(user)
       let admin = false;
-      if(user){
+      if (user) {
         admin = user?.role === 'admin';
       }
       // console.log(admin)
-      res.send({admin})
+      res.send({ admin })
 
     })
 
     // cart---------------------------------
     app.get('/cart', async (req, res) => {
       const email = req.query.email;
-      const query = {email: email};
+      const query = { email: email };
       const result = await cartCollection.find(query).toArray();
       res.send(result)
     })
@@ -144,9 +184,9 @@ async function run() {
       res.send(result)
     })
 
-    app.delete('/cart/:id', async(req, res) => {
+    app.delete('/cart/:id', async (req, res) => {
       const id = req.params.id;
-      const query = {_id: new ObjectId(id)}
+      const query = { _id: new ObjectId(id) }
       const result = await cartCollection.deleteOne(query)
       res.send(result)
     })
