@@ -8,8 +8,16 @@ const jwt = require('jsonwebtoken')
 
 // middleware
 // Configure CORS options
+const allowedOrigins = ['https://techshop-a12ce.web.app', 'http://localhost:5173'];
 const corsOptions = {
-  origin: 'https://techshop-a12ce.web.app',
+  origin: function (origin, callback) {
+    // Check if the origin is in the list of allowed origins
+    if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
   credentials: true, // If you need to send cookies or other credentials
   optionsSuccessStatus: 204
@@ -33,7 +41,7 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    // await client.connect();
+    await client.connect();
 
     const componentsCollection = client.db("techshop").collection('components');
     const cartCollection = client.db("techshop").collection('cart');
@@ -174,6 +182,19 @@ async function run() {
       // console.log(admin)
       res.send({ admin })
 
+    })
+
+    //-------------------ADMIN STATS--------------
+    app.get('/admin-stats', async(req, res) => {
+      const users = await usersCollection.estimatedDocumentCount();
+      const components = await componentsCollection.estimatedDocumentCount();
+      const orders = await cartCollection.estimatedDocumentCount();
+
+      res.send({
+        users,
+        components,
+        orders,
+      })
     })
 
     // cart---------------------------------
